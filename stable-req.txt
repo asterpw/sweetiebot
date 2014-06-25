@@ -1,0 +1,10 @@
+beautifulsoup4==4.3.1
+configobj==4.7.2
+html5lib==0.99
+mechanize==0.2.5
+numpy==1.6.2
+pygame==1.9.2a0
+pytagcloud==0.3.5
+python-dateutil==1.5
+simplejson==3.3.0
+wolframalpha==1.0.2
