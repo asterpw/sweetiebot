@@ -198,7 +198,7 @@ class Post:
 		html = htmlOpen(showthreadurlforpostproxy+ str(self.postId))
 		match = re.search("forumdisplay\.php\?(?:s=[0-9a-f]+&a?m?p?;?)?f=([0-9]+)", html)
 		self.forumId = match.group(1)
-		match = re.search("showthread\.php\?(?:s=[0-9a-f]+&a?m?p?;?)?t=([0-9]+)", html)
+		match = re.search("showthread\.php\?(?:s=[0-9a-f]+&a?m?p?;?)?mode=hybrid&amp;t=([0-9]+)", html)
 		return match.group(1)
 
 	def doSpider(self):
@@ -272,6 +272,8 @@ class Thread:
 		tags = soup.findAll("div",{"class": "PW-postbit"})
 		self.posts = [Post(re.search("showpost\.php\?.*p=([0-9]*)", str(tag)).group(1), 
 			str(tag)) for tag in tags]
+		tag = soup.find('img', {'alt': "Reload this Page"})		
+		self.title = tag.parent.parent.contents[3].text.strip()
 
 def doLogin():
 	print 'Doing Login'
@@ -531,7 +533,7 @@ def doAppendReply(postId, text):
 		
 def updatePost(postId, updates={}, appends={}):
 	url = baseurl + "editpost.php?do=editpost&postid=" + str(postId)
-	print "UPDATING:", postId, updates.keys()
+	print "UPDATING:", postId, updates.keys(), appends.keys()
 	if config["quietmode"] == 'True':
 		print "QUIET MODE DETECTED"
 		return
@@ -1308,10 +1310,6 @@ def findManualPatchCommand(post, command, args):
 	message = getFindManualPatchMessage()
 	reply = quotePost(post, command) + decorate(message)
 	doReply(post.postId, reply)
-	
-def getPatchListingUrl():
-	#$$$$
-	1
 
 def getFindManualPatchMessage():
 	#return "With the new website layout I'm not sure where to find the manual patch these days, that's something I need to figure out."
@@ -1590,15 +1588,64 @@ def wolframAlphaCommand(post, command, args):
 		return
 	reply = quotePost(post, command) + decorate(message)
 	doReply(post.postId, reply)
+	
+def doTag(color, note, post):
+	colorMessage = ""
+	noteMessage = ""
+	if color: 
+		colorMessage = " as " + color.lower() 
+	else: 
+		color = "default"
+	if note: noteMessage = "\n[i]Note: " + note + "[/i]"
+	thread = Thread(post.getThreadId())
+	message = "\n\n[url=%s]%s[/url]" % (showthreadurlnotproxy % (str(thread.threadId), '1'), thread.title)
+	message += "\nTagged by %s on %s" % (decorateName(post.name), str(getPostTime(post.time))) + noteMessage
+	
+	print "C: %s N: %s M: %s" % (color, note, message)
+	
+	tagPostList = Post(config['tagtrackpost'])
+	if tagPostList.text.find(invisible("<tag-"+color+">")) == -1:
+		tagCategory = invisible("<tag-"+color+">") + "\n\n[color=white]Tag: [color=%s]%s[/color][/color]" % (color,color.upper())
+		tagCategory += invisible("</tag-"+color+">")
+		doAppendReply(config['tagtrackpost'], decorate(tagCategory))
+	
+	updatePost(config['tagtrackpost'], appends={"tag-"+color: message})
+	
+	return "This thread has been [url=%s]tagged[/url]" % (showposturlnotproxy + config['tagtrackpost']) + colorMessage + noteMessage
 
-def scanPostForCommand(postId):
-	print "scanning Post", postId
-	post = Post(postId)
+def untagCommand(post, command, args):
+	print "Got untag request", command, args
+	if post.admin == '0'  and post.name != 'heero200':
+		requestDeniedReply(post, command, args)
+		return
+	message = "The untag command is not ready at the moment"
+	reply = quotePost(post, command) + decorate(message)
+	doReply(post.postId, reply)
+
+def tagCommand(post, command, args):
+	print "Got tag request", command, args
+	if post.admin == '0' and post.name != 'heero200':
+		requestDeniedReply(post, command, args)
+		return
+	match = re.search('(post|thread)(?: +as +([^ ]+))?(?: +with +note +(.+))?', args, re.IGNORECASE)
+	print match.groups()
+	if match:
+		color = match.group(2).lower() if match.group(2) else ""
+		note = match.group(3) if match.group(3) else ""
+		message = doTag(color, note, post)
+	else:
+		message = "Error in command :(, the correct format for this is:\n [color=white]Sweetiebot tag this (post|thread) [as (color)] [with note (message)][/color]"
+	print message
+	reply = quotePost(post, command) + decorate(message)
+	doReply(post.postId, reply)
+
+def scanPostForCommand(post):
+	print "scanning Post", post.postId
 	if post.name.startswith(config['botname']) or (isBeingIgnored(post.name) and post.admin == '0'):
 		return False
 
 	text = post.text
-	print baseurl + "showthread.php?p=" + str(postId) +" : "+post.name+"\n"+ text
+	print baseurl + "showthread.php?p=" + str(post.postId) +" : "+post.name+"\n"+ text
 	commands = [
 		('analy[sz]e', analyzeCommand),
 		('show me(?: +an? +(?:image|picture) +of)?', showMeCommand),
@@ -1616,7 +1663,9 @@ def scanPostForCommand(postId):
 		('(?:forge|reforge|craft|manufacture)(?: +me)?(?: +a +)?', forgeCommand),
 		('(?:farm|kill)(?: +me)?', farmCommand),
 		('(?:tell|talk|i +want +to +know)(?: +to)?(?: +me)? +(?:about +cats|(?:a +)?cat +facts?)', catsCommand),
-		('(?:what(?: +is|\'?s)?|where|when|who|how +(?:many|much))', wolframAlphaCommand)
+		('(?:what(?: +is|\'?s)?|where|when|who|how +(?:many|much))', wolframAlphaCommand),
+		('tag this', tagCommand),
+		('untag this', untagCommand)
 	]
 	keys = [x[0] for x in commands]
 	regex = "^\s*" + config['botname'] + "[^a-z0-9\n]* *(?:can you |will you |please |pl[sz] |could you |would you |won't you )*("+"|".join(keys)+"|\S*)[.;!?,]*? *([^ \n].*)?"
@@ -1625,6 +1674,7 @@ def scanPostForCommand(postId):
 	for match in re.finditer(regex, text, re.IGNORECASE | re.MULTILINE):
 		found += 1
 		matched = False
+		isPWDB = False
 		print "Found",match.groups()
 		for command in commands:
 			if re.match(command[0], match.group(1), re.IGNORECASE):
@@ -1632,10 +1682,11 @@ def scanPostForCommand(postId):
 				if config['quietmode'] == 'True' and command[1] != startTalkingCommand and post.admin == '0':
 					continue
 				command[1](post, match.group(0), match.group(2))
+				isPWDB = command[1] in [packCommand, forgeCommand, farmCommand]		
 				break
 		if not matched and config['quietmode'] != 'True':
 			askBotCommand(post, match.group(0))
-		if post.admin == '0' and found == 2:
+		if post.admin == '0' and ((isPWDB and found >= 5) or (not isPWDB and found >= 2)):
 			break
 	
 	return found > 0
@@ -1818,7 +1869,8 @@ def searchForCommand():
 	for postId in postIds:
 		if int(postId) > int(config['minPostId']):
 			print "Found New Post", postId, config['minPostId']
-			updated |= scanPostForCommand(postId)
+			post = Post(postId)
+			updated |= scanPostForCommand(post)
 			setMinPostId(postId)
 	return updated
 
