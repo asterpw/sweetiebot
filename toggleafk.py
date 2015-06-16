@@ -1,7 +1,7 @@
 #!/usr/bin/python
 from sweetiebot import *
 
-AFK_MESSAGE = "\n\nStatus: f:fume AFK AFK AFK f:fume"
+AFK_MESSAGE = "\n\nStatus: b:cry AFK AFK AFK b:cry"
 NOT_AFK_MESSAGE = "\n\nStatus: ONLINE"
 settings.testMode = False;
 doLogin()

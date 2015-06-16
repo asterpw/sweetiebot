@@ -23,21 +23,22 @@ import pwdb
 import cats
 import wa
 from urllib2 import URLError
-
+import socks
+import urllib2
 
 loginurl = "http://www.perfectworld.com/login"
 accounturl = 'https://account.perfectworld.com/login'
 searchurl = 'http://pwi-forum.perfectworld.com/search.php'
-showposturlnotproxy = 'http://pwi-forum.perfectworld.com/showpost.php?p='
-showposturl = "http://aster.ohmydays.net/pw/forumfetch.php?link=showpost.php%3Fp%3D"
-showthreadurl = 'http://aster.ohmydays.net/pw/forumfetch.php?link=showthread.php%%3Ft%%3D%s%%26page%%3D%s'
-showthreadurlnotproxy = 'http://pwi-forum.perfectworld.com/showthread.php?t=%s&page=%s'
+showposturl = 'http://pwi-forum.perfectworld.com/showpost.php?p='
+#showposturl = "http://aster.ohmydays.net/pw/forumfetch.php?link=showpost.php%3Fp%3D"
+#showthreadurl = 'http://aster.ohmydays.net/pw/forumfetch.php?link=showthread.php%%3Ft%%3D%s%%26page%%3D%s'
+showthreadurl = 'http://pwi-forum.perfectworld.com/showthread.php?t=%s&page=%s'
 showthreadurlforpost = 'http://pwi-forum.perfectworld.com/showthread.php?p='
-showthreadurlforpostproxy = 'http://aster.ohmydays.net/pw/forumfetch.php?link=showthread.php%3Fp%3D'
+#showthreadurlforpostproxy = 'http://aster.ohmydays.net/pw/forumfetch.php?link=showthread.php%3Fp%3D'
 #showarchivethreadurl = "http://aster.ohmydays.net/pw/forumfetch.php?link=archive%2Findex.php%2Ft-"
 showarchivethreadurl = "http://pwi-forum.perfectworld.com/archive/index.php/t-"
-getdailythreadurl = "http://aster.ohmydays.net/pw/forumfetch.php?link=search.php%3Fdo%3Dgetdaily"
-#getdailythreadurl = "http://pwi-forum.perfectworld.com/search.php?do=getdaily"
+#getdailythreadurl = "http://aster.ohmydays.net/pw/forumfetch.php?link=search.php%3Fdo%3Dgetdaily"
+getdailythreadurl = "http://pwi-forum.perfectworld.com/search.php?do=getdaily"
 
 
 chartApiHour = "http://chart.googleapis.com/chart?chf=bg,s,1b1c1f&chxr=1,0,23&chxs=0,EFEFEF,12,0,lt,EFEFEF&chxt=x&chbh=a&chs=440x130&cht=bvg&chco=76A4FB&chtt=Posts+by+Hour:&chts=EFEFEF,13,l&chds=a&chd=t:"
@@ -52,7 +53,7 @@ chartApiWeeklyTopPosters = "http://chart.googleapis.com/chart?chf=bg,s,1b1c1f&ch
 
 
 baseurl = 'http://pwi-forum.perfectworld.com/'
-proxybaseurl = "http://aster.ohmydays.net/pw/forumfetch.php?link="
+#proxybaseurl = "http://aster.ohmydays.net/pw/forumfetch.php?link="
 
 MAX_SLEEP_INTERVAL = 400
 TOP_USER_COUNT = 200
@@ -113,6 +114,7 @@ def getTextContentForTag(tag):
 		else:
 			text += getTextContentForTag(content)
 	return text
+	
 	
 def htmlOpen(url):
 	print "Opening URL:", url
@@ -195,14 +197,14 @@ class Post:
 
 				
 	def getThreadId(self):
-		html = htmlOpen(showthreadurlforpostproxy+ str(self.postId))
+		html = htmlOpen(showthreadurlforpost+ str(self.postId))
 		match = re.search("forumdisplay\.php\?(?:s=[0-9a-f]+&a?m?p?;?)?f=([0-9]+)", html)
 		self.forumId = match.group(1)
 		match = re.search("showthread\.php\?(?:s=[0-9a-f]+&a?m?p?;?)?mode=hybrid&amp;t=([0-9]+)", html)
 		return match.group(1)
 
 	def doSpider(self):
-		html = htmlOpen(showthreadurlforpostproxy+ str(self.postId))
+		html = htmlOpen(showthreadurlforpost+ str(self.postId))
 		match = re.search("showthread\.php\?(?:s=[0-9a-f]+&a?m?p?;?)?t=([0-9]+)", html)
 		posts = Thread(match.group(1), html=html).posts
 		for post in posts:
@@ -265,7 +267,7 @@ class Thread:
 	def __init__(self, threadId, page=1, html=''):
 		self.threadId = threadId
 		retry_count = 0
-		print "scanning thread", threadId, showthreadurlnotproxy%(str(threadId),page)
+		print "scanning thread", threadId, showthreadurl%(str(threadId),page)
 		if html == '':
 			html = htmlOpen(showthreadurl%(str(threadId),page))
 		soup = BeautifulSoup(html, "html5lib")
@@ -273,7 +275,7 @@ class Thread:
 		self.posts = [Post(re.search("showpost\.php\?.*p=([0-9]*)", str(tag)).group(1), 
 			str(tag)) for tag in tags]
 		tag = soup.find('img', {'alt': "Reload this Page"})		
-		self.title = tag.parent.parent.contents[3].text.strip()
+		self.title = tag.parent.parent.find('strong').text.strip()
 
 def doLogin():
 	print 'Doing Login'
@@ -290,6 +292,11 @@ def doLogin():
 	br.form.action = accounturl
 	response = br.submit()
 	settings.cookies.save()
+	# SWITCH TO THE PROXY!!
+	#if __name__ == "__main__":
+	#	socks.set_default_proxy(socks.SOCKS5, "proxy-nl.privateinternetaccess.com",1080,True,"x2341981","KbTTFR4nFU")
+	#	socket.socket = socks.socksocket  #dont add ()!!!
+
 
 def init():
 	settings.cookies = cookielib.MozillaCookieJar('./cookies.txt')
@@ -302,6 +309,7 @@ def init():
 		br.set_handle_referer(True)
 		br.set_handle_robots(False)
 		br.addheaders = [('User-agent', 'Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.0.1) Gecko/2008071615 Fedora/3.0.1-1.fc9 Firefox/3.0.1')]
+		socket.setdefaulttimeout(30)
 		# Want debugging messages?
 		#br.set_debug_http(True)
 		#br.set_debug_redirects(True)
@@ -421,7 +429,8 @@ def getTextForName(name, subforum='', doFullSearch=False):
 			break
 		if nextPageLink != "":
 			print " Going to " + nextPageLink
-			page = br.open(proxybaseurl + urllib.quote(nextPageLink)).read()
+			#page = br.open(proxybaseurl + urllib.quote(nextPageLink)).read()
+			page = br.open(nextPageLink).read()
 			partialPosts = getPartialPostsFromSearchPage(page)
 			nextPageLink = getNextPageLinkFromSearchPage(page)
 		else:
@@ -433,7 +442,7 @@ def birthDayFlavor():
 	
 	colors = ['pink', 'wheat', 'LemonChiffon']
 	celebrating = ['Celebrating', 'Commemorating', 'Marking the occasion of']
-	time = ['1 year', 'one year','one full year', 'my first anniversary']
+	time = ['2 years', 'two years','two full years', 'my second anniversary']
 	chatting = ['replying', 'chatting', 'talking', 'trolling', 'helping']
 	here = ['on the forums', 'in the PWI forums', 'on these forums']
 	r = random.choice
@@ -735,7 +744,7 @@ def getMessageForThreadStats(stats):
 	startdate = stats['startdate']
 	enddate = stats['enddate']
 	age = (enddate - startdate).days
-	message = "[b]"+config['botname'] + "[/b] has finished reading the thread: [b][url="+showthreadurlnotproxy%(stats['threadid'],1)+"]"+stats['title']+"[/url][/b]!\n\n"
+	message = "[b]"+config['botname'] + "[/b] has finished reading the thread: [b][url="+showthreadurl%(stats['threadid'],1)+"]"+stats['title']+"[/url][/b]!\n\n"
 	message += "[b]General Stats:[/b]\n"
 	message += "First Post: [color=white]%s[/color]\n" % (startdate.strftime("%m-%d-%Y"))
 	message += "Last Post: [color=white]%s[/color]\n" % (enddate.strftime("%m-%d-%Y"))
@@ -841,9 +850,11 @@ def getAnalyzeStats(target, subforum=''):
 		totalDays = (result['lastPostDate'].date() - datetime.datetime.strptime(result['post'].joinDate, "%b %Y").date()).days + 1	
 		if target not in config['users']:
 			config['users'][target] = {}
-		favWord = result['textanalysis']['favoritewords0'][0][0].replace("'", "#").replace('"', "#")
-		if favWord == config['botname'].lower():
-			favWord = result['textanalysis']['favoritewords0'][1][0].replace("'", "#").replace('"', "#")
+		favWord = "?"
+		if result['textanalysis']['favoritewords0']:
+			favWord = result['textanalysis']['favoritewords0'][0][0].replace("'", "#").replace('"', "#")
+			if favWord == config['botname'].lower():
+				favWord = result['textanalysis']['favoritewords0'][1][0].replace("'", "#").replace('"', "#")
 			
 		print "Finished for", target, result['post'].postCount
 			
@@ -1171,7 +1182,7 @@ def doMonthlyPointsReset():
 	users = getSortedPointsUsers('monthly')
 	winner = "%s ([color=white]%d[/color])" % (decorateName(users[0]), int(config['points']['monthly']['scorelist'][users[0]])) if users else 'nobody'
 	updatePost(config['points']['monthly']['postId'], appends={ 
-		"PREVIOUS" : "\n[url=%s]%s PWI Forum High Scores[/url] - winner: %s" % (showposturlnotproxy+postId, config['points']['monthly']['month'], winner)})
+		"PREVIOUS" : "\n[url=%s]%s PWI Forum High Scores[/url] - winner: %s" % (showposturl+postId, config['points']['monthly']['month'], winner)})
 	config['points']['monthly']['month'] = getServerDateTime().strftime("%B %Y")
 	config['points']['monthly']['scorelist'] = {}
 	config.write()
@@ -1186,6 +1197,134 @@ def getTopPointsMessage(scorelist, title="PWI Forum High Scores", limit=-1):
 		message +="%d) %s ([color=white]%d[/color])\n" % (i+1, decorateName(user), int(scorelist[user])) 
 	return message
 
+def getPromoCodesMessage():
+	message = "\n"
+	codelist = config['code']['codelist']
+	codes = codelist.keys()
+	codes.sort(key = lambda x: codelist[x]['expires'])
+	
+	current = []
+	expired = []
+	
+	for code in codes[::-1]:
+		days = 1000
+		if codelist[code]['expires']:
+			days = (datetime.datetime.strptime(codelist[code]['expires'], "%Y-%m-%d") - datetime.datetime.now()).days
+		print code, days
+		if days < 0:
+			if days < 700:
+				expired.append((code,days))
+		else:
+			current.append((code,days))
+	
+	def messageForCode(code, codelist, expired):
+		expirationMessage = invisible("---- ") + ("Expired" if expired else "Expires")
+		expirationMessage += " on %s" % codelist[code]['expires'] if codelist[code]['expires'] else " on ????"
+		result = "[color=%s][b]%s[/b][/color] - [color=white]%s[/color]\n%s Added by %s on %s" %('cyan' if not expired else 'pink',
+			code, 
+			codelist[code]['item'],
+			expirationMessage,
+			decorateName(codelist[code]['author']),
+			codelist[code]['addedon'])
+		return result + "\n"
+	
+	if len(current) > 0:
+		message += "[b][SIZE=4]Current Code List[/size][/b]\n\n"		
+		for code in current:
+			message += messageForCode(code[0], codelist, False)
+		
+	if len(expired) > 0:
+		message += "\n\n[color=pink][b]Recently Expired Code List[/b][/color]\n\n"	
+		for code in expired:
+			message += messageForCode(code[0], codelist, True)
+	return message
+
+
+def promoCodeCommand(post, command, args):
+	print "Got Promo Code Command", command,"-", args
+	match = re.search ('(?:modify|add) +code +(.{8}) +for +(?:a |the )?(.+?)(?: +which +expires +on +([0-9\-/]+))?$', command)
+	errorMessage = "Please use this exact command:\n"
+	errorMessage += "Sweetiebot add code <CODE> for <ITEM(s)> [which expires on YYYY-MM-DD]\n"
+	errorMessage += "[color=white]Example[/color]: Sweetiebot add code 75HtYCE6 for a Jones Blessing which expires on 2016-01-01"
+	message = ""
+	if not match:
+		message = "Can't quite understand that :( " + errorMessage
+		reply = quotePost(post, command) + decorate(message)
+		doReply(post.postId, reply)
+		return		
+	code = match.group(1)
+	item = match.group(2)
+	if re.search('expir', match.group(2)):
+		message = "There's some issue with the expiration, it needs to say 'which expires on' :(\n" + errorMessage
+		reply = quotePost(post, command) + decorate(message)
+		doReply(post.postId, reply)
+		return	
+	date = match.group(3) 
+	date = date if date else ""
+	if date:
+		try:
+			datetime.datetime.strptime(date, "%Y-%m-%d")
+		except:
+			message = "The date has to be ISO-8601 format, YYYY-MM-DD\n" + errorMessage
+			reply = quotePost(post, command) + decorate(message)
+			doReply(post.postId, reply)
+			return	
+	author = post.name
+	print 'code is '+'|'.join((code,item,date,author))
+	if int(post.postCount.replace(',', '')) < int(config['code']['minpostcount']):
+		message = "Sorry but you need to have at least %s posts to be able to set codes" % config['code']['minpostcount']
+		reply = quotePost(post, command) + decorate(message)
+		doReply(post.postId, reply)
+		return		
+	
+	if code in config['code']['codelist']:
+		message += "This changed an existing code.\nThis can be undone with: [color=white]Sweetiebot modify code %s for %s%s[/color]\n" % (
+			code,
+			config['code']['codelist'][code]['item'],
+			(" which expires on [color=white]%s[/color]"%config['code']['codelist'][code]['expires']) if config['code']['codelist'][code]['expires'] else ""
+			)
+	
+	config['code']['codelist'][code] = {}
+	config['code']['codelist'][code]['item'] = item	
+	config['code']['codelist'][code]['expires'] = date
+	config['code']['codelist'][code]['author'] = author
+	config['code']['codelist'][code]['addedon'] = getPostTime(post.time).date()
+	
+	if int(config['code']['postId']) > 0:
+		updatePost(config['code']['postId'], {"CODES" : getPromoCodesMessage()})
+	
+	message = "Added code [color=cyan]%s[/color] - [color=white]%s[/color]%s!\n\n" %(code, item, (" which expires on [color=white]%s[/color]"%date) if date else "") + message
+	message += "If this code is expired or not valid remove it with:\n[color=white]Sweetiebot remove code %s[/color]" % code
+	reply = quotePost(post, command) + decorate(message)
+	doReply(post.postId, reply)
+
+def removeCodeCommand(post, command, args):
+	print "Got Remove Code Command", command,"-", args
+
+	if int(post.postCount.replace(',', '')) < int(config['code']['minpostcount']):
+		message = "Sorry but you need to have at least %s posts to be able to remove codes" % config['code']['minpostcount']
+		reply = quotePost(post, command) + decorate(message)
+		doReply(post.postId, reply)
+		return	
+	
+	code = args.split(' ')[0]
+	if code in config['code']['codelist']:
+		codeValue = config['code']['codelist'][code] 
+		config['code']['codelist'].pop(code, None)
+		message = "Removing promo code [color=cyan]%s[/color]\n" % code
+		message += "If this was a mistake and you can confirm the code is still valid this can be undone with:\n[color=white]Sweetiebot add code %s for %s%s[/color]" % (code,
+			codeValue['item'],
+			(" which expires on " + codeValue['expires']) if codeValue['expires'] else '')
+		reply = quotePost(post, command) + decorate(message)
+		doReply(post.postId, reply)
+		
+		if int(config['code']['postId']) > 0:
+			updatePost(config['code']['postId'], {"CODES" : getPromoCodesMessage()})
+	else:
+		message = "I don't think %s is a code, maybe it was already removed or expired?" % code
+		reply = quotePost(post, command) + decorate(message)
+		doReply(post.postId, reply)
+	
 def doChat(name, message):
 	bots = [ChatterBotType.PANDORABOTS, ChatterBotType.JABBERWACKY, ChatterBotType.CLEVERBOT]
 	
@@ -1311,7 +1450,7 @@ def findManualPatchCommand(post, command, args):
 	reply = quotePost(post, command) + decorate(message)
 	doReply(post.postId, reply)
 
-def getFindManualPatchMessage():
+def getFindManualPatchMessage(forMaint=False):
 	#return "With the new website layout I'm not sure where to find the manual patch these days, that's something I need to figure out."
 	"""html = htmlOpen(techsupportUrl)
 	soup = BeautifulSoup(html, "html5lib")
@@ -1321,18 +1460,22 @@ def getFindManualPatchMessage():
 	print 'found patch url', currentPatchLink['href']
 	
 	currentpatch = currentPatchLink['href']
-	patchText = currentPatchLink.text.strip()"""
-	techsupportUrl = 'http://pwi-forum.perfectworld.com/forumdisplay.php?f=142'
+	patchText = currentPatchLink.text.strip()
 	results = searchForThreadByTitle('patch', False, 'only Cabbage Patch Notes');
 	curVersion = re.search('Patch Notes.*?([0-9]+)', results[0].title).group(1)
 	oldVersion = re.search('Patch Notes.*?([0-9]+)', results[1].title).group(1)
-	currentpatch = "http://pwi-ns.perfectworld.com/patches/manual/ec_patch_"+oldVersion+"-"+curVersion+".cup"
-	patchText = "Patch %s - %s" % (oldVersion, curVersion)
+	currentpatch = "http://pwi-ns.perfectworld.com/patches/manual/ec_patch_"+oldVersion+"-"+curVersion+".cup"""
+	techsupportUrl = 'http://pwi-forum.perfectworld.com/forumdisplay.php?f=142'
+	currentpatch = config['maintenance']['currentPatch']
+	patchText = "Patch %s" % (re.search("([0-9]+-[0-9]+)", currentpatch).group(0))
 	nextpatch = checkForMorePatches(currentpatch)
 	message = ''
 	if nextpatch == "":
-		message = 'The latest manual patch is here: [URL="'+currentpatch+'"]'+patchText+"[/URL]\n"
-		message += "This is the newest one that's [URL="+techsupportUrl+"]officially listed[/URL] and I don't see anything newer."
+		if forMaint:
+			message = "There doesn't seem to be any new manual patch for this maintenance.\nAt least not yet."
+		else:
+			message = 'The latest manual patch is here: [URL="'+currentpatch+'"]'+patchText+"[/URL]\n"
+			message += "This is the newest one that's [URL="+techsupportUrl+"]officially listed[/URL] and I don't see anything newer."
 	else:
 		patchText = "Patch " + re.search("([0-9]+-[0-9]+)", nextpatch[1]).group(0)
 		size = nextpatch[0]
@@ -1346,6 +1489,10 @@ def getFindManualPatchMessage():
 		else:
 			message += "Wow this thing is big! \n\n"
 		message += "This patch hasn't been [URL="+techsupportUrl+"]officially listed[/URL] yet."
+		
+		if forMaint:
+			config['maintenance']['currentPatch'] = nextpatch[1]
+			config.write()
 		 
 	return message	
 	
@@ -1395,6 +1542,11 @@ def addToIgnoreCommand(post, command, args):
 		requestDeniedReply(post, command, args)
 		return
 	print "Gonna ignore", args
+	
+	message = ''
+	#if re.search('this +thread|thread +[0-9]+', args):
+	#	
+	#else:
 	message, users = getMultiUsers(args)
 	expiration = -1
 	match = re.search(' +for +([0-9]+) +days?', args)
@@ -1473,7 +1625,7 @@ def annoyingPostingLocationMessage(post, threadId):
 	if not post.forumId:
 		post.getThreadId()
 	if post.forumId == "4":  #General Discussion
-		return "[color=white][b]Please consider posting requests like this in [url=%s]this thread[/url] instead of in General Discussion.[/b][/color]\n\n" % (showthreadurlnotproxy % (threadId, "99999"))
+		return "[color=white][b]Please consider posting requests like this in [url=%s]this thread[/url] instead of in General Discussion.[/b][/color]\n\n" % (showthreadurl % (threadId, "99999"))
 	return ""
 	
 def doRestrictedLocationPost(post, command, message, threadId, newLocationPostId):
@@ -1589,7 +1741,7 @@ def wolframAlphaCommand(post, command, args):
 	reply = quotePost(post, command) + decorate(message)
 	doReply(post.postId, reply)
 	
-def doTag(color, note, post):
+def doTag(isPost, color, note, post):
 	colorMessage = ""
 	noteMessage = ""
 	if color: 
@@ -1598,20 +1750,24 @@ def doTag(color, note, post):
 		color = "default"
 	if note: noteMessage = "\n[i]Note: " + note + "[/i]"
 	thread = Thread(post.getThreadId())
-	message = "\n\n[url=%s]%s[/url]" % (showthreadurlnotproxy % (str(thread.threadId), '1'), thread.title)
+	if not isPost:
+		url = showthreadurl % (str(thread.threadId), '1')
+	else:
+		url = showposturl + str(post.postId)
+	message = "\n\n[url=%s]%s[/url]" % (url, thread.title)
 	message += "\nTagged by %s on %s" % (decorateName(post.name), str(getPostTime(post.time))) + noteMessage
 	
 	print "C: %s N: %s M: %s" % (color, note, message)
 	
 	tagPostList = Post(config['tagtrackpost'])
-	if tagPostList.text.find(invisible("<tag-"+color+">")) == -1:
+	if tagPostList.text.find("<tag-"+color+">") == -1:
 		tagCategory = invisible("<tag-"+color+">") + "\n\n[color=white]Tag: [color=%s]%s[/color][/color]" % (color,color.upper())
 		tagCategory += invisible("</tag-"+color+">")
 		doAppendReply(config['tagtrackpost'], decorate(tagCategory))
 	
 	updatePost(config['tagtrackpost'], appends={"tag-"+color: message})
 	
-	return "This thread has been [url=%s]tagged[/url]" % (showposturlnotproxy + config['tagtrackpost']) + colorMessage + noteMessage
+	return "This %s has been [url=%s]tagged[/url]" % ("post" if isPost else "thread", showthreadurlforpost + config['tagtrackpost']) + colorMessage + noteMessage
 
 def untagCommand(post, command, args):
 	print "Got untag request", command, args
@@ -1627,12 +1783,13 @@ def tagCommand(post, command, args):
 	if post.admin == '0' and post.name != 'heero200':
 		requestDeniedReply(post, command, args)
 		return
-	match = re.search('(post|thread)(?: +as +([^ ]+))?(?: +with +note +(.+))?', args, re.IGNORECASE)
+	match = re.search('(post|thread)(?: +as +([^ ]+))?(?: +with +note[;:-]* *(.+))?', args, re.IGNORECASE)
 	print match.groups()
 	if match:
+		isPost = (match.group(1).lower() == 'post')
 		color = match.group(2).lower() if match.group(2) else ""
 		note = match.group(3) if match.group(3) else ""
-		message = doTag(color, note, post)
+		message = doTag(isPost, color, note, post)
 	else:
 		message = "Error in command :(, the correct format for this is:\n [color=white]Sweetiebot tag this (post|thread) [as (color)] [with note (message)][/color]"
 	print message
@@ -1646,7 +1803,9 @@ def scanPostForCommand(post):
 
 	text = post.text
 	print baseurl + "showthread.php?p=" + str(post.postId) +" : "+post.name+"\n"+ text
-	commands = [
+	commands = [  
+		('(?:modify|add) +code +(?:.{8}) +for +(?:a |the )?(?:.+?)(?: +which +expires +on +(?:[0-9\-/]+))?$', promoCodeCommand),
+		('remove +code +', removeCodeCommand),
 		('analy[sz]e', analyzeCommand),
 		('show me(?: +an? +(?:image|picture) +of)?', showMeCommand),
 		('(?:what +is|where +is|find)(?: +the)? +(?:manual +|latest +)+patch', findManualPatchCommand),
@@ -1693,11 +1852,8 @@ def scanPostForCommand(post):
 
 def doMaintenanceReply(post):
 	message = "First non-human reply!\n\n"
-	manPatchMessage = getFindManualPatchMessage()
-	if re.search("I don't see anything newer", manPatchMessage):
-		message += "There doesn't seem to be any new manual patch for this maintenance.\nAt least not yet."
-	else:
-		message += manPatchMessage
+	manPatchMessage = getFindManualPatchMessage(True)
+	message += manPatchMessage
 	print post.text
 	questionMatch = re.search("^(.*\?)", post.text, re.MULTILINE)
 	if questionMatch:
@@ -1733,7 +1889,8 @@ def getRecentThreads():
 		threadResults.extend(getThreadResults(html))
 		if settings.recentThreadId == 0:
 			nextPageLink = getNextPageLinkFromSearchPage(html)
-			address = proxybaseurl + urllib.quote(nextPageLink)
+			address = nextPageLink
+			#address = proxybaseurl + urllib.quote(nextPageLink)
 		else:
 			break
 		break #Just do first page for now
@@ -1744,7 +1901,12 @@ def checkThreadForNecro(threadResult):
 		return False
 	threadPage = threadResult.getFullThread(-1)
 	print "checking reply", threadResult.threadId, threadResult.postCount - 2, len(threadPage.posts)
-	post = threadPage.posts[(threadResult.postCount - 2) % 10]
+	secondToLast = (threadResult.postCount - 2) % 10
+	#forum sometimes has bad postcounts
+	if secondToLast < len(threadPage.posts):
+		post = threadPage.posts[secondToLast]
+	else:
+		post = threadPage.posts[-1]
 	postDate = getPostTime(post.time)
 	timeDiff = threadResult.lastPost.postDate - postDate
 	print "Checked thread",threadResult.threadId, "for Necro", timeDiff
@@ -1760,7 +1922,8 @@ def checkForNecros():
 			or (thread.threadId in settings.notNecroThreads and (datetime.datetime.now() - settings.notNecroThreads[thread.threadId]).days < 30) \
 			or thread.isSticky \
 			or thread.forum in ['Quality Corner', 'The Fanatics Forum', 'Screenshots & Videos'] \
-			or thread.author == thread.lastPost.name:
+			or thread.author == thread.lastPost.name \
+			or (thread.lastPost.name in config['users'] and config['users'][thread.lastPost.name]['admin'] != '0'):
 			settings.notNecroThreads[thread.threadId] = thread.lastPost.postDate
 			continue
 		else:
@@ -1781,7 +1944,7 @@ def doNecroReply(postId, timeDiff, lastPostDate):
 	message = "This looks like a [color=cyan]NECRO[/color]!\n\n" 
 	message += post.name + " replied to a message that was "
 	message += "".join([numMessage(x[0], x[1]) for x in [(relDiff.years, 'year'), (relDiff.months, 'month'), (relDiff.days, 'day'), (relDiff.hours, 'hour'), (relDiff.minutes, 'minute')]])
-	message += "old.\n\nAny thread over one month (30 days) old is considered to be a dead thread and you're not supposed to post in them.  The person you are replying to probably doesn't care any more or can no longer be found on the forums.  The topic itself could be out of date.  Next time just make a new thread.\n\nLet's see how long it takes for a mod to close this :)"
+	message += "old.\n\nAny thread over one month (30 days) old is considered to be a dead thread and you're not supposed to post in them.  The person you are replying to probably doesn't care any more or can no longer be found on the forums.  The topic itself could be out of date.  Next time just make a new thread."
 	message = quotePost(post, post.text) + decorate(message)
 	doReply(postId, message)
 
@@ -1820,7 +1983,7 @@ def searchForThreadByTitle(title, doQuote=True, subforum=''):
 	return results
 
 def searchForMaintenanceThread():
-	results = searchForThreadByTitle("Maintenance Discussion", False)
+	results = searchForThreadByTitle("Maintenance", False)
 	print "Scanning maintenance thread minid is", config['maintenance']['threadId']
 	for result in results:
 		threadId = result.threadId
@@ -1921,7 +2084,12 @@ def updateTopPosters():
 	#	if config['users'][user]['admin'] == '0' and int(config['users'][user]['postCount']) < 1000:
 	#		del config['users'][user] #clean up scrubs
 	config['topposters']['scandate'] = dayCount()
+	updateWeeklyPostCounts()
 	config.write()	
+
+def updateWeeklyPostCounts():
+	for user in config['users']:
+		config['users'][user]['weeklyPostCount'] = config['users'][user]['postCount']
 
 def updateTopPosterRanks():
 	allPosters = config['users'].keys()

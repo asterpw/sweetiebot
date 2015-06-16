@@ -1,0 +1,6 @@
+# Netscape HTTP Cookie File
+# http://www.netscape.com/newsref/std/cookie_spec.html
+# This is a generated file!  Do not edit.
+
+.perfectworld.com	TRUE	/	FALSE	1465916430	pwilastactivity	0
+.perfectworld.com	TRUE	/	FALSE	1465916430	pwilastvisit	1425325347

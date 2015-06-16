@@ -4,16 +4,40 @@ import time
 import datetime
 import re
 import random
+import sys
 
 url = "https://query.yahooapis.com/v1/public/yql?q=select%20*%20from%20html%20where%20url%3D%22http%3A%2F%2Fpwi-forum.perfectworld.com%2Fshowthread.php%3Ft%3D1585581%26page%3D836%22&diagnostics=true"
 
+
+post = Post(22369071)
+#print post.getThreadId()
+#print Thread(post.getThreadId()).title
+#post.text = 'Sweetiebot add code 75HtYCE6 for a Jones Blessing which expires on 2016-05-01'
+
+scanPostForCommand(post)
+exit()
+post.text = 'Sweetiebot add code asdfasdf for a Jones Blessing which expires on 2015-05-01'
+
+scanPostForCommand(post)
+post.text = 'Sweetiebot add code fdasfdas for a Jones Blessing which expires on 2016-01-01'
+
+scanPostForCommand(post)
+post.text = 'Sweetiebot add code EXPIREDD for a Jones Blessing which expires on 2014-01-01'
+scanPostForCommand(post)
+post.text = 'Sweetiebot add code dsfddddd for a Omalley'
+
+scanPostForCommand(post)
+post.text = 'Sweetiebot remove code fdasfdas'
+
+scanPostForCommand(post)
+sys.exit()
 #html = htmlOpen(url)
 
 #soup = BeautifulSoup(html, "html5lib")
 #tag = soup.find("div",{"class": "bigusername"})
 #print tag
 
-checkForNecros()
+#checkForNecros()
 
 results = searchForThreadByTitle('patch', False, 'only Cabbage Patch Notes');
 print results
@@ -26,7 +50,7 @@ print curVersion
 linkAddress = "http://pwi-ns.perfectworld.com/patches/manual/ec_patch_"+oldVersion+"-"+curVersion+".cup"
 print linkAddress
 
-print getFindManualPatchMessage()
+#print getFindManualPatchMessage()
 
 #scanPostForCommand(21508191)
 #print getFindManualPatchMessage()

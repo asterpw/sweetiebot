@@ -64,6 +64,7 @@ def searchMob(mobname):
 	mobIds = re.findall('href="mob/([0-9]+)">', html)
 	if len(mobIds) == 0:
 		return False
+	print 'Found mob', mobIds[0], 'for mobname', mobname
 	return mobIds[0]
 
 def getMob(mobId):
@@ -159,7 +160,7 @@ def getMobNameColor(playerlevel, moblevel):
 
 def killMobOnce(mob, playerlevel, bonusDrop):
 	result = {}
-	if random.random() < mob.addDropChance:
+	if random.random() < mob.addDropChance and len(mob.addDrop) > 0:
 		item = selectItem(random.random(), mob.addDrop)
 		result[item] = result.get(item, 0) + 1
 	coinItem = Item('Coin(s)', '3044', 'item_color0', 1, 1)
@@ -171,7 +172,7 @@ def killMobOnce(mob, playerlevel, bonusDrop):
 	for i in range(mob.defDropChances[0]*bonusDrop):
 		roll = random.random()
 		for times,chance in enumerate(mob.defDropChances[1]):
-			if roll < chance:
+			if roll < chance  and len(mob.defDrop) > 0:
 				for j in range(times):
 					item = selectItem(random.random(), mob.defDrop)
 					result[item] = result.get(item, 0) + 1
@@ -248,7 +249,7 @@ def getCardPackFromItemHtml(html):
 	packNameElem = soup.find('div', {'id': 'content'}).find('th', {'class': 'itemHeader'}).contents[0]
 	span = packNameElem.find('span')
 	packColor = packNameElem['class'][0] if packNameElem.name == 'span' else 'item_color0'
-	packName = packNameElem.text.strip()
+	packName = packNameElem.text.strip() if packNameElem.name == 'span' else str(packNameElem).strip()
 	packId = re.search('items/([0-9]+)', html).group(1)
 	pack = Item(packName, packId, packColor, 0, 0)
 	pack.questId = 0
@@ -310,10 +311,12 @@ def getPackFromName(packname):
 	pack = None
 	message = ''
 	namesToTry = ['"%s"' % (packname), packname]
-	if packname.endswith('s'):
+	if packname.endswith('es'):
+		namesToTry.append('"'+packname[:-2]+'"')
+		namesToTry.append(packname[:-2])
+	elif packname.endswith('s'):
 		namesToTry.append('"'+packname[:-1]+'"')
 		namesToTry.append(packname[:-1])
-	
 	
 	for packNameCandidate in namesToTry:
 		html = searchItem(packNameCandidate)
@@ -332,7 +335,7 @@ def getPackFromName(packname):
 				pack.payout.sort(key=lambda x: x.chance*-1)
 				packCache[packname] = pack
 				return pack, ''
-	return 0, "Sorry but I can't find a pack called '%s' :(\nTry again with the exact spelling." % (packname)
+	return 0, "Sorry but I can't find a pack called '%s' on [url=http://pwdatabase.com]pwdb[/url] :(\nIt might not be there yet.  Try again with the exact spelling." % (packname)
 
 	
 packCache = {}

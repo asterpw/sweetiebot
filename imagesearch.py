@@ -6,7 +6,7 @@ import uploadimage
 
 
 def imageSearch(text):
-	searchurl='https://ajax.googleapis.com/ajax/services/search/images?v=1.0&'
+	searchurl='https://ajax.googleapis.com/ajax/services/search/images?v=1.0&safe=active&'
 	query = urllib.urlencode({'q': text})
 	url = searchurl + query
 	search_response = urllib.urlopen(url)
